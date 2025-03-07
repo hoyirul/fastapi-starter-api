@@ -1,0 +1,818 @@
+# madhai.py
+# -*- coding: utf-8 -*-
+# Copyright 2024 - Mochammad Hairullah
+
+"""
+This script is used to generate new modules, migrations, seeders, keys in the FastAPI project structure.
+DON'T MODIFY THIS FILE UNLESS YOU KNOW WHAT YOU'RE DOING.
+THIS SCRIPT IS USED TO GENERATE NEW MODULES, MIGRATIONS, SEEDERS, AND KEYS IN THE FASTAPI PROJECT STRUCTURE.
+"""
+
+import os
+import argparse
+import inflect
+import secrets
+from src.utils.logging import Logging
+from sync.migrations import upgrade, downgrade
+from sync.seeders import seed, rollback
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+
+logger = Logging(level="INFO")
+
+
+# Function to create files and directories for a new module, supporting nested paths
+def create_module(module_name):
+    p = inflect.engine()
+
+    # Split the module name into components based on '/' to support nested paths
+    path_components = module_name.split("/")
+
+    # Define the base path for the new module's folder (e.g., src/modules/permissions/role)
+    last_component = p.plural(path_components[-1].lower())
+    path_components[-1] = last_component
+    base_path = os.path.join("src", "modules", *path_components)
+
+    # Create the module folder if it doesn't exist (this will handle nested directories as well)
+    os.makedirs(base_path, exist_ok=True)
+
+    # List of files to be created in the new module
+    files = generate_files(module_name)  # Use the last component for naming the module
+
+    # Create the files with customized content
+    for file_name, content in files.items():
+        file_path = os.path.join(base_path, file_name)
+        # Create the file with the specified content
+        with open(file_path, "w") as f:
+            f.write(content)
+
+    # Output a message indicating the module has been successfully created
+    logger.log(
+        "info",
+        f"Module '{p.plural(module_name)}' created successfully in '{base_path}'",
+    )
+
+
+# Function to generate the files that will be created based on the module name
+def generate_files(module_name):
+    p = inflect.engine()  # Using inflect for pluralization
+    path_components = module_name.split("/")
+    class_name = (
+        path_components[-1].replace("_", " ").title().replace(" ", "")
+    )  # Using PascalCase format (singular)
+    table_name = p.plural(path_components[-1].lower())  # Plural form (lowercase)
+    params = "{" + "id" + "}"
+    columns = "{" + "self.id" + "}"
+    extend_existing = "{" + '"extend_existing": True' + "}"
+    table_name_audit_logs = f"'{table_name}'"
+    audit_logs = (
+        "sa_relationship_kwargs={"
+        + '"primaryjoin":'
+        + f'"(cast({class_name}.id, String) == foreign(AuditLog.record_id)) & (AuditLog.model_name == {table_name_audit_logs})"'
+        + "}"
+    )
+    activity_log_create = (
+        "await self.activity_log(request=request,body={"
+        + '"action_id":'
+        + 'await self.action_type("CREATE", session),'
+        + '"record_id":'
+        + f"body.id,"
+        + '"model_name":'
+        + f"{class_name}.__tablename__"
+        + "},session=session)"
+    )
+
+    activity_log_update = (
+        "await self.activity_log(request=request,body={"
+        + '"action_id":'
+        + 'await self.action_type("UPDATE", session),'
+        + '"record_id":'
+        + f"id,"
+        + '"model_name":'
+        + f"{class_name}.__tablename__"
+        + "},session=session)"
+    )
+
+    activity_log_delete = (
+        "await self.activity_log(request=request,body={"
+        + '"action_id":'
+        + 'await self.action_type("DELETE", session),'
+        + '"record_id":'
+        + f"id,"
+        + '"model_name":'
+        + f"{class_name}.__tablename__"
+        + "},session=session)"
+    )
+
+    activity_log_restore = (
+        "await self.activity_log(request=request,body={"
+        + '"action_id":'
+        + 'await self.action_type("RESTORE", session),'
+        + '"record_id":'
+        + f"id,"
+        + '"model_name":'
+        + f"{class_name}.__tablename__"
+        + "},session=session)"
+    )
+
+    keywords = "{" + "keywords" + "}"
+
+    returned_data = '{"current_page": current_page,"total_count": total_count,"per_page": limit,"total_pages": total_pages,"data": response,}'
+
+    # Templates for each file
+    files = {
+        "__init__.py": f"""# src/modules/{p.plural(module_name)}/__init__.py
+# -*- coding: utf-8 -*-
+# Copyright 2024 - Mochammad Hairullah
+
+from . import models
+from . import routers
+from . import services
+from . import schemas
+""",
+        "models.py": f"""# src/modules/{p.plural(module_name)}/models.py
+# -*- coding: utf-8 -*-
+# Copyright 2024 - Mochammad Hairullah
+
+from sqlmodel import SQLModel, Field, Column, Relationship
+import sqlalchemy.dialects.postgresql as pg
+from datetime import datetime
+import sqlalchemy as sa
+from typing import List, Optional
+
+
+class {class_name}(SQLModel, table=True):
+    __tablename__ = "{table_name}"
+    __table_args__ = {extend_existing}
+
+    id: int = Field(sa_column=Column(pg.BIGINT, primary_key=True, autoincrement=True))
+    # Add your fields here
+    audit_logs: Optional[List["AuditLog"]] = Relationship(
+        {audit_logs}
+    )
+
+    def __repr__(self):
+        # you have to change this to your model fields to be displayed for example self.id
+        return f"<{class_name} {columns}>"
+""",
+        "schemas.py": f"""# src/modules/{p.plural(module_name)}/schemas.py
+# -*- coding: utf-8 -*-
+# Copyright 2024 - Mochammad Hairullah
+
+from pydantic import BaseModel
+from datetime import datetime
+from typing import List, Optional
+from pydantic import validator
+from src.modules.logs.audit_logs.schemas import AuditLogSchema
+from src.utils.pagination import PaginationSchema
+
+class {class_name}Schema(BaseModel):
+    id: int
+    # Add your fields here
+    audit_logs: Optional[List[AuditLogSchema]] # dont remove this line, it's for audit logs
+
+    class Config:
+        orm_mode = True
+
+class {class_name}ResponseSchema(PaginationSchema):
+    data: Optional[List[{class_name}Schema]]
+
+    # dont forget to add this config for the orm_mode
+    class Config:
+        orm_mode = True
+
+
+class {class_name}RequestSchema(BaseModel):
+    # Add your fields here
+    pass
+
+# you can add more schemas if you need
+""",
+        "services.py": f"""# src/modules/{p.plural(module_name)}/services.py
+# -*- coding: utf-8 -*-
+# Copyright 2024 - Mochammad Hairullah
+
+from sqlmodel.ext.asyncio.session import AsyncSession
+from fastapi.exceptions import HTTPException
+from .schemas import {class_name}RequestSchema
+from .models import {class_name}
+from src.modules.logs.audit_logs.models import AuditLog
+from sqlmodel import select, desc, cast, String
+from fastapi import status, Request
+from typing import Optional
+from sqlalchemy.orm import joinedload
+from src.utils.logging import Logging, ActivityLog
+from src.utils.actions import ActionType
+from sqlalchemy import func
+
+class {class_name}Service:
+    # you can delete the function below if you don't need it
+    def __init__(self):
+        self.logger = Logging(level="DEBUG")
+        self.activity_log = ActivityLog(level="DEBUG")
+        self.action_type = ActionType()
+
+    async def all(self, request: Request, session: AsyncSession, keywords: Optional[str] = None, skip: int = 0, limit: int = 10) -> dict:
+        # Checking if the record is trashed (deleted)
+        trashed = await AuditLog().is_trashed({class_name})
+
+        # Build the query for fetching data
+        q = (
+            select({class_name})
+            .select_from({class_name})
+            .outerjoin(AuditLog, AuditLog.record_id == cast({class_name}.id, String))
+        )
+
+        # Apply search keyword filter
+        if keywords:
+            q = q.filter({class_name}.name.ilike(f"%{keywords}%"))
+
+        q = (
+            q.options(
+                joinedload({class_name}.audit_logs),
+                joinedload({class_name}.audit_logs).joinedload(AuditLog.user),
+                joinedload({class_name}.audit_logs).joinedload(AuditLog.action),
+            )
+            .filter(~trashed)  # Exclude trashed data
+            .order_by(desc({class_name}.id))  # Order by {class_name}.id descending
+            .offset(skip)  # Pagination offset (skip)
+            .limit(limit)  # Pagination limit (number of records per page)
+        )
+
+        # Execute the query for data data with pagination
+        result = await session.execute(q)
+        response = result.unique().scalars().all()
+
+        # Count the total number of records without pagination
+        count_query = select(func.count({class_name}.id)).select_from({class_name}).filter(~trashed)
+        if keywords:
+            count_query = count_query.filter({class_name}.name.ilike(f"{keywords}"))
+        count_response = await session.execute(count_query)
+        total_count = count_response.scalar()
+
+        # Calculate the total number of pages
+        total_pages = (
+            total_count + limit - 1
+        ) // limit  # This is the ceiling of total_count / limit
+
+        # Calculate the current page based on skip and limit
+        current_page = skip // limit + 1 if total_count > 0 else 0
+
+        # Return the data along with pagination information
+        return {returned_data}
+        
+    async def find(self, id: int, request: Request, session: AsyncSession) -> Optional[{class_name}]:
+        trashed = await AuditLog().is_trashed({class_name})
+        q = (
+            select({class_name})
+            .options(
+                joinedload({class_name}.audit_logs),
+                joinedload({class_name}.audit_logs).joinedload(AuditLog.user),
+                joinedload({class_name}.audit_logs).joinedload(AuditLog.action),
+            )
+            .where({class_name}.id == id)
+            .filter(~trashed)
+        )
+        {class_name.lower()} = await session.execute(q)
+        response = {class_name.lower()}.scalars().first()
+        if response is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="{class_name} not found"
+            )
+        return response
+
+    async def create(self, request: Request, body: {class_name}RequestSchema, session: AsyncSession) -> dict:
+        body = {class_name}(**body.dict())
+        session.add(body)
+        await session.commit()
+
+        {activity_log_create}
+        
+        return body
+
+    async def update(
+        self, id: int, request: Request, body: {class_name}RequestSchema, session: AsyncSession
+    ) -> dict:    
+        response = await self.find(id, request, session)
+        for key, value in body.dict().items():
+            setattr(response, key, value)
+        await session.commit()
+                
+        {activity_log_update}
+
+        return response
+
+    async def destroy(self, id: int, request: Request, session: AsyncSession) -> dict:
+        response = await self.find(id, request, session)
+        # await session.delete(response) # This hard delete the record, you can change it to soft delete with:
+        # await session.commit()
+                
+        {activity_log_delete}
+
+        return response
+    
+    async def trash(self, request: Request, session: AsyncSession, keywords: Optional[str] = None, skip: int = 0, limit: int = 10) -> dict:
+        # Checking if the record is trashed (deleted)
+        trashed = await AuditLog().is_trashed({class_name})
+
+        # Build the query for fetching data
+        q = (
+            select({class_name})
+            .select_from({class_name})
+            .outerjoin(AuditLog, AuditLog.record_id == cast({class_name}.id, String))
+        )
+
+        # Apply search keyword filter
+        if keywords:
+            q = q.filter({class_name}.name.ilike(f"%{keywords}%"))
+
+        q = (
+            q.options(
+                joinedload({class_name}.audit_logs),
+                joinedload({class_name}.audit_logs).joinedload(AuditLog.user),
+                joinedload({class_name}.audit_logs).joinedload(AuditLog.action),
+            )
+            .filter(trashed)  # Just trashed data
+            .order_by(desc({class_name}.id))  # Order by {class_name}.id descending
+            .offset(skip)  # Pagination offset (skip)
+            .limit(limit)  # Pagination limit (number of records per page)
+        )
+
+        # Execute the query for data data with pagination
+        result = await session.execute(q)
+        response = result.unique().scalars().all()
+
+        # Count the total number of records without pagination
+        count_query = select(func.count({class_name}.id)).select_from({class_name}).filter(trashed)
+        if keywords:
+            count_query = count_query.filter({class_name}.name.ilike(f"{keywords}"))
+        count_response = await session.execute(count_query)
+        total_count = count_response.scalar()
+
+        # Calculate the total number of pages
+        total_pages = (
+            total_count + limit - 1
+        ) // limit  # This is the ceiling of total_count / limit
+
+        # Calculate the current page based on skip and limit
+        current_page = skip // limit + 1 if total_count > 0 else 0
+
+        # Return the data along with pagination information
+        return {returned_data}
+    
+    async def restore(self, id: int, request: Request, session: AsyncSession) -> dict:
+        q = select({class_name}).where({class_name}.id == id)
+        {class_name.lower()} = await session.execute(q)
+        response = {class_name.lower()}.scalars().first()
+        if response is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="{class_name} not found"
+            )
+
+        {activity_log_restore}
+
+        return response
+""",
+        "routers.py": f"""# src/modules/{p.plural(module_name)}/routers.py
+# -*- coding: utf-8 -*-
+# Copyright 2024 - Mochammad Hairullah
+
+from fastapi import APIRouter, status, Depends, Request, Query
+from fastapi.exceptions import HTTPException
+from .schemas import {class_name}RequestSchema, {class_name}Schema, {class_name}ResponseSchema
+from .models import {class_name}
+from .services import {class_name}Service
+from src.databases import db
+from typing import List
+from sqlalchemy.ext.asyncio.session import AsyncSession
+from src.utils.dependency import AccessTokenBearer, AccessControlBearer
+
+router = APIRouter(
+    dependencies=[Depends(AccessTokenBearer())],
+)
+
+service = {class_name}Service()
+session = db.session
+
+
+@router.get("/", response_model={class_name}ResponseSchema, status_code=status.HTTP_200_OK)
+async def index(request: Request,
+    session: AsyncSession = Depends(session),
+    keywords: str = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, le=100),
+    _: bool = Depends(AccessControlBearer(permissions=["manage:{table_name.replace('_', '-')}", "view:{table_name.replace('_', '-')}"])),
+):
+    return await service.all(request, session, keywords, skip, limit)
+
+
+@router.get("/{params}", response_model={class_name}Schema, status_code=status.HTTP_200_OK)
+async def show(
+    id: int, 
+    request: Request, 
+    session: AsyncSession = Depends(session),
+    _: bool = Depends(AccessControlBearer(permissions=["manage:{table_name.replace('_', '-')}", "view:{table_name.replace('_', '-')}"])),
+):
+    return await service.find(id, request, session)
+
+@router.post("/", response_model={class_name}, status_code=status.HTTP_201_CREATED)
+async def store(
+    request: Request, 
+    body: {class_name}RequestSchema, 
+    session: AsyncSession = Depends(session),
+    _: bool = Depends(AccessControlBearer(permissions=["manage:{table_name.replace('_', '-')}", "create:{table_name.replace('_', '-')}"])),
+):
+    return await service.create(request, body, session)
+
+
+@router.put("/{params}", response_model={class_name}, status_code=status.HTTP_200_OK)
+async def update(
+    id: int, 
+    request: Request, 
+    body: {class_name}RequestSchema, 
+    session: AsyncSession = Depends(session),
+    _: bool = Depends(AccessControlBearer(permissions=["manage:{table_name.replace('_', '-')}", "update:{table_name.replace('_', '-')}"])),
+):
+    return await service.update(id, request, body, session)
+
+
+@router.delete("/{params}", response_model={class_name}, status_code=status.HTTP_200_OK)
+async def delete(
+    id: int, 
+    request: Request, 
+    session: AsyncSession = Depends(session),
+    _: bool = Depends(AccessControlBearer(permissions=["manage:{table_name.replace('_', '-')}", "delete:{table_name.replace('_', '-')}"])),
+):
+    return await service.destroy(id, request, session)
+
+@router.get("/trash/all", response_model={class_name}ResponseSchema, status_code=status.HTTP_200_OK)
+async def trash(request: Request,
+    session: AsyncSession = Depends(session),
+    keywords: str = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, le=100),
+    _: bool = Depends(AccessControlBearer(permissions=["manage:{table_name.replace('_', '-')}", "trash:{table_name.replace('_', '-')}"])),
+):
+    return await service.trash(request, session, keywords, skip, limit)
+
+    
+@router.patch("/{params}", response_model={class_name}, status_code=status.HTTP_200_OK)
+async def patch(
+    id: int, 
+    request: Request, 
+    session: AsyncSession = Depends(session),
+    _: bool = Depends(AccessControlBearer(permissions=["manage:{table_name.replace('_', '-')}", "restore:{table_name.replace('_', '-')}"])),
+):
+    return await service.restore(id, request, session)
+""",
+    }
+
+    return files
+
+
+def generate_migrations(migrations, alter=False):
+    from datetime import datetime
+
+    # Tentukan direktori untuk menyimpan file migrasi
+    migrations_dir = "sync/migrations"
+    os.makedirs(migrations_dir, exist_ok=True)
+
+    # Generate file name with timestamp replace create_table_ or alter_table_ with empty string
+    table_name = (
+        migrations.lower().replace("create_table_", "").replace("alter_table_", "")
+    )
+
+    table = "alter_table" if alter == True else "table"
+    module_table = table
+    table = "{" + table + "}"
+    file_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{migrations}.py"
+    file_path = os.path.join(migrations_dir, file_name)
+    query_up = f"CREATE TABLE {table} (id BIGSERIAL PRIMARY KEY);"
+    query_down = f"DROP TABLE {table};"
+    query_alter_up = f"ALTER TABLE {table} ADD COLUMN id BIGSERIAL PRIMARY KEY;"
+    query_alter_down = f"ALTER TABLE {table} DROP COLUMN id;"
+
+    if alter:
+        upgrade = query_alter_up
+        downgrade = query_alter_down
+    else:
+        upgrade = query_up
+        downgrade = query_down
+
+    # Konten migrasi
+    migration_content = f"""
+# sync/migrations/{file_name}
+# -*- coding: utf-8 -*-
+# Copyright 2024 - Mochammad Hairullah
+
+{module_table} = "{table_name}"
+
+async def upgrade(engine):
+    await engine.execute(
+        f\"\"\"
+        {upgrade}
+        \"\"\"
+    )
+
+async def downgrade(engine):
+    await engine.execute(
+        f\"\"\"
+        {downgrade}
+        \"\"\"
+    )
+"""
+    # Menyimpan ke file
+    with open(file_path, "w") as f:
+        f.write(migration_content)
+
+    logger.log("info", f"Migration file '{file_name}' has been created.")
+
+
+def generate_seeders(table_name):
+    from datetime import datetime
+
+    # Tentukan direktori untuk menyimpan file migrasi
+    migrations_dir = "sync/seeders"
+    os.makedirs(migrations_dir, exist_ok=True)
+
+    # Generate file name with timestamp
+    table_name = table_name.lower()
+    table = "{" + "table" + "}"
+    file_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{table_name}_seeder.py"
+    file_path = os.path.join(migrations_dir, file_name)
+
+    # Konten migrasi
+    migration_content = f"""
+# sync/seeders/{table_name}_seeder.py
+# -*- coding: utf-8 -*-
+# Copyright 2024 - Mochammad Hairullah
+
+table = "{table_name}"
+
+async def seed(engine):
+    f\"\"\"Insert initial data into {table} table\"\"\"
+    query = f\"\"\"
+    INSERT INTO {table} (yourcolumn) VALUES
+    (yourvalue1),
+    (yourvalue2),
+    (yourvalue3);
+    \"\"\"
+    await engine.execute(query)
+
+async def rollback(engine):
+    f\"\"\"Clear all data from {table} table\"\"\"
+    query = f"TRUNCATE TABLE {table};"
+    await engine.execute(query)
+"""
+    # Menyimpan ke file
+    with open(file_path, "w") as f:
+        f.write(migration_content)
+
+    logger.log("info", f"Migration file '{file_name}' has been created.")
+
+
+# Function to update the .env file with new SECRET_KEY and JWT_KEY
+def update_env_file(hex_key: int = 32):
+    from src.utils.chiper import generate_key, encrypt_password
+
+    skey = secrets.token_hex(hex_key)
+    jkey = secrets.token_hex(hex_key)
+    dkey = (generate_key(skey)).hex()
+    # hkey = encrypt_password(params, generate_key(skey))
+
+    # Check if the .env file exists
+    if not os.path.exists(".env"):
+        logger.log(
+            "error",
+            "The .env file does not exist. Please create one before updating the keys.",
+        )
+        return
+
+    # Read the existing .env file and replace the SECRET_KEY and JWT_KEY
+    with open(".env", "r") as file:
+        lines = file.readlines()
+
+    # Create a new list to store updated lines
+    updated_lines = []
+    secret_key_updated = False
+    jwt_secret_key_updated = False
+    db_secret_key = False
+
+    for line in lines:
+        if line.startswith("SECRET_KEY="):
+            updated_lines.append(f"SECRET_KEY={skey}\n")
+            secret_key_updated = True
+        elif line.startswith("JWT_SECRET_KEY="):
+            updated_lines.append(f"JWT_SECRET_KEY={jkey}\n")
+            jwt_secret_key_updated = True
+        elif line.startswith("DB_SECRET_KEY="):
+            updated_lines.append(f"DB_SECRET_KEY={dkey}\n")
+            db_secret_key = True
+        else:
+            updated_lines.append(line)
+
+    # If the keys weren't found, append them at the end
+    if not secret_key_updated:
+        updated_lines.append(f"SECRET_KEY={skey}\n")
+    if not jwt_secret_key_updated:
+        updated_lines.append(f"JWT_SECRET_KEY={jkey}\n")
+    if not db_secret_key:
+        updated_lines.append(f"DB_SECRET_KEY={dkey}\n")
+
+    # Write the updated content back to the .env file
+    with open(".env", "w") as file:
+        file.writelines(updated_lines)
+
+    logger.log(
+        "info",
+        "The SECRET_KEY, JWT_SECRET_KEY, and DB_SECRET_KEY have been updated in the .env",
+    )
+    # logger.log("info", f"Change DB_PASSWORD to {hkey} in the .env")
+
+
+def hash_password_with_key(password: str = None, key: str = None):
+    from src.utils.chiper import encrypt_password
+
+    encrypted = encrypt_password(password, key)
+
+    logger.log("info", f"Change Your Value to {encrypted} in the .env")
+
+
+# Function to parse command-line arguments and execute the module creation or update
+async def main():
+    parser = argparse.ArgumentParser(description="Generate a new module or update keys")
+
+    # Add argument for the module name (optional)
+    parser.add_argument(
+        "--module",
+        type=str,
+        required=False,
+        help="Name of the module to generate",
+    )
+
+    parser.add_argument(
+        "--make",
+        action="store_true",
+        help="Generate a migration file",
+    )
+
+    parser.add_argument(
+        "--migration",
+        type=str,
+        required=False,
+        help="Name of the table to generate migration",
+    )
+
+    parser.add_argument(
+        "--seeder",
+        type=str,
+        required=False,
+        help="Name of the table to generate seeder",
+    )
+
+    # To Migration specific table
+    parser.add_argument(
+        "--table",
+        type=str,
+        required=False,
+        help="Name of the table to generate",
+    )
+
+    # To Migration Database
+    parser.add_argument(
+        "--upgrade",
+        action="store_true",
+        help="Upgrade the database",
+    )
+
+    parser.add_argument(
+        "--downgrade",
+        action="store_true",
+        help="Downgrade the database",
+    )
+
+    parser.add_argument(
+        "--alter",
+        action="store_true",
+        help="Seed the database",
+    )
+
+    parser.add_argument(
+        "--seed",
+        action="store_true",
+        help="Seed the database",
+    )
+
+    parser.add_argument(
+        "--rollback",
+        action="store_true",
+        help="Rollback the database",
+    )
+
+    parser.add_argument(
+        "--hash",
+        type=str,
+        required=False,
+        help="Hash the password",
+    )
+
+    parser.add_argument(
+        "--generate",
+        action="store_true",
+        help="For generate key",
+    )
+
+    # Add argument for updating keys (optional, using store_true to make it a flag)
+    parser.add_argument(
+        "--key",
+        type=str,
+        required=False,
+        help="Update the SECRET_KEY, JWT_SECRET_KEY, and DB_SECRET_KEY in the .env file",
+    )
+
+    args = parser.parse_args()
+
+    if args.module:
+        # If a module name is provided, create the module
+        create_module(args.module)
+
+    if args.generate:
+        if args.key:
+            # If --key is provided, update the .env file with new keys
+            hex_key = int(args.key)
+            update_env_file(hex_key)
+        else:
+            logger.log("error", "Please provide a key to update the .env file.")
+
+    if args.make:
+        if args.migration:
+            # If --make and --migration are provided, generate a migration file
+            if args.alter:
+                generate_migrations(args.migration, alter=True)
+            else:
+                generate_migrations(args.migration)
+        elif args.seeder:
+            # If --make and --seeder are provided, generate a seeder file
+            generate_seeders(args.seeder)
+        else:
+            # If --make is provided without --migration, generate a migration file without a specific table name
+            logger.log("error", "Please provide a table name for the migration file.")
+
+    if args.upgrade:
+        if args.table:
+            if args.alter:
+                await upgrade(args.table, alter=True)
+            else:
+                await upgrade(args.table)
+        else:
+            await upgrade()  # Run all migrations
+
+    if args.downgrade:
+        if args.table:
+            if args.alter:
+                await downgrade(args.table, alter=True)
+            else:
+                await downgrade(args.table)
+        else:
+            await downgrade()  # Run all downgrades
+
+    if args.seed:
+        if args.table:
+            await seed(args.table)
+        else:
+            await seed()  # Run all seeders
+
+    if args.rollback:
+        if args.table:
+            await rollback(args.table)
+        else:
+            await rollback()  # Run all seeders
+
+    if args.hash:
+        if args.key:
+            hash_password_with_key(args.hash, args.key)
+        else:
+            logger.log("error", "Please provide a key for the hash password.")
+    if (
+        not args.module
+        and not args.key
+        and not args.upgrade
+        and not args.downgrade
+        and not args.make
+        and not args.migration
+        and not args.seeder
+        and not args.seed
+        and not args.rollback
+        and not args.alter
+        and not args.hash
+    ):
+        # If no arguments are provided, show the help message
+        parser.print_help()
+
+
+# Run the main function if this script is executed directly
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(main())

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hello World - FastAPI</title>
+  <!-- Link untuk Open Sans dari Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    /* Menggunakan font Open Sans untuk seluruh body */
+    body {
+      font-family: 'Open Sans', sans-serif;
+    }
+
+    .welcome-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .content {
+      text-align: center;
+    }
+
+    .title {
+      color: #1e293b;
+      font-size: 2rem;
+      margin-bottom: 10px;
+      margin-top: 30px;
+      font-weight: 500;
+    }
+
+    .links {
+      margin-top: 15px;
+    }
+
+    .links a {
+      margin: 0 5px;
+    }
+
+    /* Style for custom link buttons */
+    .custom-btn {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #475569;
+      border-radius: 10px;
+      text-decoration: none;
+      color: #fff;
+      transition: all 0.3s ease;
+    }
+
+    .custom-btn:hover {
+      background-color: #334155;
+      text-decoration: none;
+      color: #fff;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="welcome-container">
+    <div class="content">
+      <a href="{{ data.fastapi }}" target="_blank"><img src="/favicon.ico" width="100" alt=""></a>
+      <div class="title">{{ data.title }}</div>
+      <p>{{ data.description }}</p>
+      <div class="links">
+        <a class="custom-btn" href="{{ data.docs }}" target="_blank">API Documentation</a>
+        <a class="custom-btn" href="{{ data.redoc }}" target="_blank">API Redoc</a>
+        <a class="custom-btn" href="{{ data.convention_id }}" target="_blank">Code Convention (ID)</a>
+        <a class="custom-btn" href="{{ data.convention_en }}" target="_blank">Code Convention (EN)</a>
+        <a class="custom-btn" href="{{ data.fastapi }}" target="_blank">FastAPI Framework</a>
+      </div>
+      <p style="text-align: center; margin-top: 20px;">By {{ data.by }}</p>
+    </div>
+  </div>
+</body>
+
+</html>
