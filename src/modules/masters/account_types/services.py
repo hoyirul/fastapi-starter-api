@@ -31,61 +31,66 @@ class AccountTypeService:
         skip: int = 0,
         limit: int = 10,
     ) -> dict:
-        # Checking if the record is trashed (deleted)
-        trashed = await AuditLog().is_trashed(AccountType)
+        try:
+            # Checking if the record is trashed (deleted)
+            trashed = await AuditLog().is_trashed(AccountType)
 
-        # Build the query for fetching data
-        q = (
-            select(AccountType)
-            .select_from(AccountType)
-            .outerjoin(AuditLog, AuditLog.record_id == cast(AccountType.id, String))
-        )
-
-        # Apply search keyword filter
-        if keywords:
-            q = q.filter(AccountType.name.ilike(f"%{keywords}%"))
-
-        q = (
-            q.options(
-                joinedload(AccountType.audit_logs),
-                joinedload(AccountType.audit_logs).joinedload(AuditLog.user),
-                joinedload(AccountType.audit_logs).joinedload(AuditLog.action),
+            # Build the query for fetching data
+            q = (
+                select(AccountType)
+                .select_from(AccountType)
+                .outerjoin(AuditLog, AuditLog.record_id == cast(AccountType.id, String))
             )
-            .filter(~trashed)  # Exclude trashed data
-            .order_by(desc(AccountType.id))  # Order by AccountType.id descending
-            .offset(skip)  # Pagination offset (skip)
-            .limit(limit)  # Pagination limit (number of records per page)
-        )
 
-        # Execute the query for data data with pagination
-        result = await session.execute(q)
-        response = result.unique().scalars().all()
+            # Apply search keyword filter
+            if keywords:
+                q = q.filter(AccountType.name.ilike(f"%{keywords}%"))
 
-        # Count the total number of records without pagination
-        count_query = (
-            select(func.count(AccountType.id)).select_from(AccountType).filter(~trashed)
-        )
-        if keywords:
-            count_query = count_query.filter(AccountType.name.ilike(f"{keywords}"))
-        count_response = await session.execute(count_query)
-        total_count = count_response.scalar()
+            q = (
+                q.options(
+                    joinedload(AccountType.audit_logs),
+                    joinedload(AccountType.audit_logs).joinedload(AuditLog.user),
+                    joinedload(AccountType.audit_logs).joinedload(AuditLog.action),
+                )
+                .filter(~trashed)  # Exclude trashed data
+                .order_by(desc(AccountType.id))  # Order by AccountType.id descending
+                .offset(skip)  # Pagination offset (skip)
+                .limit(limit)  # Pagination limit (number of records per page)
+            )
 
-        # Calculate the total number of pages
-        total_pages = (
-            total_count + limit - 1
-        ) // limit  # This is the ceiling of total_count / limit
+            # Execute the query for data data with pagination
+            result = await session.execute(q)
+            response = result.unique().scalars().all()
 
-        # Calculate the current page based on skip and limit
-        current_page = skip // limit + 1 if total_count > 0 else 0
+            # Count the total number of records without pagination
+            count_query = (
+                select(func.count(AccountType.id)).select_from(AccountType).filter(~trashed)
+            )
+            if keywords:
+                count_query = count_query.filter(AccountType.name.ilike(f"{keywords}"))
+            count_response = await session.execute(count_query)
+            total_count = count_response.scalar()
 
-        # Return the data along with pagination information
-        return {
-            "current_page": current_page,
-            "total_count": total_count,
-            "per_page": limit,
-            "total_pages": total_pages,
-            "data": response,
-        }
+            # Calculate the total number of pages
+            total_pages = (
+                total_count + limit - 1
+            ) // limit  # This is the ceiling of total_count / limit
+
+            # Calculate the current page based on skip and limit
+            current_page = skip // limit + 1 if total_count > 0 else 0
+
+            # Return the data along with pagination information
+            return {
+                "current_page": current_page,
+                "total_count": total_count,
+                "per_page": limit,
+                "total_pages": total_pages,
+                "data": response,
+            }
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+            )
 
     async def find(
         self, id: int, request: Request, session: AsyncSession
