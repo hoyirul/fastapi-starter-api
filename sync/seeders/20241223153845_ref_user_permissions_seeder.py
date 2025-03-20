@@ -1,6 +1,6 @@
 # sync/seeders/ref_user_permissions_seeder.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 table = "ref_user_permissions"
 

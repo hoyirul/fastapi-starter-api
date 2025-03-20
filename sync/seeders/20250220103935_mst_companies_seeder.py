@@ -1,7 +1,7 @@
 
 # sync/seeders/mst_companies_seeder.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 table = "mst_companies"
 
@@ -9,7 +9,7 @@ async def seed(engine):
     f"""Insert initial data into {table} table"""
     query = f"""
     INSERT INTO {table} (id, name, address, contact_email) VALUES
-    ('C00001', 'CV. Mochammad Hairullah', 'Jl. Raya Sentausa No. 1', 'support@irasa.co.id');
+    ('C00001', 'CV. Ika Raya Sentausa', 'Jl. Raya Sentausa No. 1', 'support@irasa.co.id');
     """
     await engine.execute(query)
 

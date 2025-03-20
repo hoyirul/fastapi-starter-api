@@ -1,6 +1,6 @@
 # sync/seeders/ref_role_permissions_seeder.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 table = "ref_role_permissions"
 
@@ -15,19 +15,19 @@ async def seed(engine):
     (1, 18),
     (1, 29),
     (1, 38),
-    (1, 51),
-    (1, 60),
-    (1, 69),
-    (1, 78),
-    (1, 87),
-    (1, 96),
-    (1, 105),
-    (1, 115),
-    (1, 124),
-    (1, 133),
-    (1, 142),
-    (1, 151),
-    (1, 160);
+    (1, 52),
+    (1, 61),
+    (1, 70),
+    (1, 79),
+    (1, 88),
+    (1, 97),
+    (1, 106),
+    (1, 116),
+    (1, 125),
+    (1, 134),
+    (1, 143),
+    (1, 152),
+    (1, 161);
     """
     await engine.execute(query)
 

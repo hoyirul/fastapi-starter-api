@@ -1,6 +1,6 @@
 # sync/migrations/__init__.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 """
 This module is used to manage database migrations.
@@ -20,36 +20,44 @@ async def upgrade(table_name=None, alter=False):
     connection = None
     try:
         connection = await get_db_connection()
-        for file in os.listdir(os.path.dirname(__file__)):
-            if file.endswith(".py") and file != "__init__.py":
-                # Migration module import
-                module = importlib.import_module(f".{file[:-3]}", "sync.migrations")
 
-                # If table_name is given, run upgrade for that table
-                if table_name and alter is False:
-                    if hasattr(module, "table") and module.table == table_name:
-                        await module.upgrade(connection)
-                        logger.log(
-                            "info",
-                            f"Migration for table {table_name} has been applied.",
-                        )
-                elif alter is True:
-                    if (
-                        hasattr(module, "alter_table")
-                        and module.alter_table == table_name
-                    ):
-                        await module.upgrade(connection)
-                        logger.log(
-                            "info",
-                            f"Migration for table {table_name} has been applied.",
-                        )
+        # Ambil semua file Python (.py) dalam folder ini, kecuali __init__.py
+        files = [file for file in os.listdir(os.path.dirname(__file__)) if file.endswith(".py") and file != "__init__.py"]
+
+        # Urutkan file berdasarkan timestamp di awal nama file (asumsi formatnya seperti 20241221082857)
+        files.sort(key=lambda file: int(file.split('_')[0]))  # Mengambil angka di awal nama file dan mengurutkannya
+
+        # Iterasi setiap file yang sudah diurutkan
+        for file in files:
+            # Import module migration
+            module = importlib.import_module(f".{file[:-3]}", "sync.migrations")
+            logger.log("info", f"Migration file: {file}")
+            
+            # Jika table_name diberikan, jalankan upgrade untuk table tersebut
+            if table_name and alter is False:
+                if hasattr(module, "table") and module.table == table_name:
+                    await module.upgrade(connection)
+                    logger.log(
+                        "info",
+                        f"Migration for table {table_name} has been applied.",
+                    )
+            elif alter is True:
+                if (
+                    hasattr(module, "alter_table")
+                    and module.alter_table == table_name
+                ):
+                    await module.upgrade(connection)
+                    logger.log(
+                        "info",
+                        f"Migration for table {table_name} has been applied.",
+                    )
+            else:
+                # Jika table_name tidak diberikan, jalankan semua migration
+                if hasattr(module, "alter_table"):
+                    continue
                 else:
-                    # if table_name is not given, run all migrations
-                    if hasattr(module, "alter_table"):
-                        continue
-                    else:
-                        await module.upgrade(connection)
-                        logger.log("info", f"Upgrade for {file} has been applied.")
+                    await module.upgrade(connection)
+                    logger.log("info", f"Upgrade for {file} has been applied.")
 
     except Exception as e:
         logger.log("error", f"Migration upgrade failed: {e}")
@@ -58,23 +66,28 @@ async def upgrade(table_name=None, alter=False):
             await connection.close()
             logger.log("info", "Database connection closed after upgrade.")
 
-
 async def downgrade(table_name=None, alter=False):
     connection = None
     try:
         connection = await get_db_connection()
-        # Get migration files and sort them in descending order (002, 001, ...)
+        
+        # Ambil semua file Python (.py) dalam folder ini, kecuali __init__.py
         migration_files = [
             file
             for file in os.listdir(os.path.dirname(__file__))
             if file.endswith(".py") and file != "__init__.py"
         ]
-        migration_files.sort(reverse=True)  # Sort the files in descending order
 
+        # Urutkan file berdasarkan timestamp yang ada di awal nama file dalam urutan menurun (descending)
+        migration_files.sort(key=lambda file: int(file.split('_')[0]), reverse=True)  # Mengurutkan dengan reverse=True
+
+        # Iterasi setiap file yang sudah diurutkan
         for file in migration_files:
+            # Import module migration
             module = importlib.import_module(f".{file[:-3]}", "sync.migrations")
+            logger.log("info", f"Migration file: {file}")
 
-            # If table_name is provided, run migration for that table
+            # Jika table_name diberikan, jalankan downgrade untuk table tersebut
             if table_name and alter is False:
                 if hasattr(module, "table") and module.table == table_name:
                     await module.downgrade(connection)
@@ -83,19 +96,22 @@ async def downgrade(table_name=None, alter=False):
                         f"Downgrade for table {table_name} has been applied.",
                     )
             elif alter is True:
-                if hasattr(module, "alter_table") and module.alter_table == table_name:
+                if (
+                    hasattr(module, "alter_table")
+                    and module.alter_table == table_name
+                ):
                     await module.downgrade(connection)
                     logger.log(
                         "info",
                         f"Downgrade for table {table_name} has been applied.",
                     )
             else:
-                # Run all migrations
+                # Jika table_name tidak diberikan, jalankan semua downgrade
                 if hasattr(module, "alter_table"):
                     continue
                 else:
                     await module.downgrade(connection)
-                logger.log("info", f"Downgrade for {file} has been applied.")
+                    logger.log("info", f"Downgrade for {file} has been applied.")
 
     except Exception as e:
         logger.log("error", f"Migration downgrade failed: {e}")
@@ -103,3 +119,4 @@ async def downgrade(table_name=None, alter=False):
         if connection:
             await connection.close()
             logger.log("info", "Database connection closed after downgrade.")
+
