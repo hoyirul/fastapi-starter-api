@@ -1,6 +1,6 @@
 # madhai.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 """
 This script is used to generate new modules, migrations, seeders, keys in the FastAPI project structure.
@@ -124,7 +124,7 @@ def generate_files(module_name):
     files = {
         "__init__.py": f"""# src/modules/{p.plural(module_name)}/__init__.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from . import models
 from . import routers
@@ -133,7 +133,7 @@ from . import schemas
 """,
         "models.py": f"""# src/modules/{p.plural(module_name)}/models.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from sqlmodel import SQLModel, Field, Column, Relationship
 import sqlalchemy.dialects.postgresql as pg
@@ -158,7 +158,7 @@ class {class_name}(SQLModel, table=True):
 """,
         "schemas.py": f"""# src/modules/{p.plural(module_name)}/schemas.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from pydantic import BaseModel
 from datetime import datetime
@@ -191,7 +191,7 @@ class {class_name}RequestSchema(BaseModel):
 """,
         "services.py": f"""# src/modules/{p.plural(module_name)}/services.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi.exceptions import HTTPException
@@ -205,6 +205,7 @@ from sqlalchemy.orm import joinedload
 from src.utils.logging import Logging, ActivityLog
 from src.utils.actions import ActionType
 from sqlalchemy import func
+from src.utils.helper import DuplicateChecker
 
 class {class_name}Service:
     # you can delete the function below if you don't need it
@@ -283,25 +284,40 @@ class {class_name}Service:
         return response
 
     async def create(self, request: Request, body: {class_name}RequestSchema, session: AsyncSession) -> dict:
-        body = {class_name}(**body.dict())
-        session.add(body)
-        await session.commit()
+        # Check if the record already exists
+        checker = DuplicateChecker({class_name}, session)
+        await checker.check({"name": body.name}) # Change the field name if necessary
+        try:
+            body = {class_name}(**body.dict())
+            session.add(body)
+            await session.commit()
 
-        {activity_log_create}
-        
-        return body
+            {activity_log_create}
+            
+            return body
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+            )
 
     async def update(
         self, id: int, request: Request, body: {class_name}RequestSchema, session: AsyncSession
     ) -> dict:    
-        response = await self.find(id, request, session)
-        for key, value in body.dict().items():
-            setattr(response, key, value)
-        await session.commit()
-                
-        {activity_log_update}
+        try:
+            response = await self.find(id, request, session)
+            for key, value in body.dict().items():
+                setattr(response, key, value)
+            await session.commit()
+                    
+            {activity_log_update}
 
-        return response
+            return response
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+            )
 
     async def destroy(self, id: int, request: Request, session: AsyncSession) -> dict:
         response = await self.find(id, request, session)
@@ -376,7 +392,7 @@ class {class_name}Service:
 """,
         "routers.py": f"""# src/modules/{p.plural(module_name)}/routers.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from fastapi import APIRouter, status, Depends, Request, Query
 from fastapi.exceptions import HTTPException
@@ -504,7 +520,7 @@ def generate_migrations(migrations, alter=False):
     migration_content = f"""
 # sync/migrations/{file_name}
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 {module_table} = "{table_name}"
 
@@ -546,7 +562,7 @@ def generate_seeders(table_name):
     migration_content = f"""
 # sync/seeders/{table_name}_seeder.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 table = "{table_name}"
 
