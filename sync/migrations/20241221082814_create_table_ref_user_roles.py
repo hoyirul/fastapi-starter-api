@@ -1,6 +1,6 @@
 # sync/migrations/20241221082814_create_table_ref_user_roles.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 table = "ref_user_roles"
 

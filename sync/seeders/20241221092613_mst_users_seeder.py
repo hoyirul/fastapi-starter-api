@@ -1,6 +1,6 @@
 # sync/seeders/mst_users_seeder.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from src.utils.security import password_hash
 
@@ -16,9 +16,6 @@ async def seed(engine):
     VALUES 
     ('Super Admin', 'superadmin@mail.com', '{password}'),
     ('Admin', 'admin@mail.com', '{password}'),
-    ('Accountant', 'accountant@mail.com', '{password}'),
-    ('Finance', 'finance@mail.com', '{password}'),
-    ('Tax Officer', 'tax@mail.com', '{password}'),
     ('User', 'user@mail.com', '{password}');
     """
     await engine.execute(query)

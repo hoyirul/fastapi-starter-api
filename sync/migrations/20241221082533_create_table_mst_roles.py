@@ -1,6 +1,6 @@
 # sync/migrations/20241221082533_create_table_mst_roles.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 table = "mst_roles"
 

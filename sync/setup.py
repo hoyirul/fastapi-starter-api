@@ -1,6 +1,6 @@
 # sync/setup.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 """
 This module is used to manage database setup.

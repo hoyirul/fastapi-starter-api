@@ -1,6 +1,6 @@
 # sync/migrations/20241221082543_create_table_mst_permissions.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 table = "mst_permissions"
 

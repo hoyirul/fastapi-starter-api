@@ -31,7 +31,6 @@ async def upgrade(table_name=None, alter=False):
         for file in files:
             # Import module migration
             module = importlib.import_module(f".{file[:-3]}", "sync.migrations")
-            logger.log("info", f"Migration file: {file}")
             
             # Jika table_name diberikan, jalankan upgrade untuk table tersebut
             if table_name and alter is False:
@@ -85,7 +84,6 @@ async def downgrade(table_name=None, alter=False):
         for file in migration_files:
             # Import module migration
             module = importlib.import_module(f".{file[:-3]}", "sync.migrations")
-            logger.log("info", f"Migration file: {file}")
 
             # Jika table_name diberikan, jalankan downgrade untuk table tersebut
             if table_name and alter is False:
@@ -119,4 +117,3 @@ async def downgrade(table_name=None, alter=False):
         if connection:
             await connection.close()
             logger.log("info", "Database connection closed after downgrade.")
-

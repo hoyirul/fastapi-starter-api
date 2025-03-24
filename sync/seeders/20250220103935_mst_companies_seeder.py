@@ -9,7 +9,7 @@ async def seed(engine):
     f"""Insert initial data into {table} table"""
     query = f"""
     INSERT INTO {table} (id, name, address, contact_email) VALUES
-    ('C00001', 'CV. Ika Raya Sentausa', 'Jl. Raya Sentausa No. 1', 'support@irasa.co.id');
+    ('C00001', 'Apple Silicon', 'Jl. Raya Kebayoran Lama No. 12', 'support@apple.com');
     """
     await engine.execute(query)
 

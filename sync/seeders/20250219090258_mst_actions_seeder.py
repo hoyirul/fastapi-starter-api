@@ -16,6 +16,8 @@ async def seed(engine):
     ('RESTORE', 'Restore a trashed record', 'slate'),
     ('POST', 'Post a existing record for journal etc', 'blue'),
     ('UNPOST', 'Post a existing record for journal etc', 'gray'),
+    ('LOCK', 'Lock a existing record for journal etc', 'neutral'),
+    ('ALLOW', 'Allow a existing record for journal etc', 'amber'),
     ('PUBLISH' , 'Publish a existing record', 'violet'),
     ('UNPUBLISH', 'Publish a existing record', 'yellow'),
     ('APPROVE', 'Approve a existing record', 'orange'),

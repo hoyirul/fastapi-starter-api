@@ -9,12 +9,7 @@ async def seed(engine):
     f"""Insert initial data into {table} table"""
     query = f"""
     INSERT INTO {table} (user_id, company_id, status) VALUES
-    (1, 'C00001', 'approved'),
-    (2, 'C00001', 'approved'),
-    (3, 'C00001', 'approved'),
-    (4, 'C00001', 'approved'),
-    (5, 'C00001', 'approved'),
-    (6, 'C00001', 'approved');
+    (1, 'C00001', 'approved');
     """
     await engine.execute(query)
 

@@ -1,6 +1,6 @@
 # sync/migrations/20241221082843_create_table_audit_logs.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 table = "audit_logs"
 

@@ -1,6 +1,6 @@
 # sync/seeders/ref_user_roles_seeder.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 table = "ref_user_roles"
 
@@ -11,10 +11,7 @@ async def seed(engine):
     INSERT INTO {table} (user_id, role_id) VALUES
     (1, 1),
     (2, 2),
-    (3, 3),
-    (4, 4),
-    (5, 5),
-    (6, 6);
+    (3, 3);
     """
     await engine.execute(query)
 

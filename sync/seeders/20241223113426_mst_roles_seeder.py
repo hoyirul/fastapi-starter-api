@@ -1,6 +1,6 @@
 # sync/seeders/mst_roles_seeder.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 table = "mst_roles"
 
@@ -11,9 +11,6 @@ async def seed(engine):
     INSERT INTO {table} (name, description) VALUES
     ('Superadmin', 'Superadmin role'),
     ('Admin', 'Admin role'),
-    ('Accountant', 'Accountant role'),
-    ('Finance', 'Finance role'),
-    ('Tax Officer', 'Tax Officer role'),
     ('User', 'User role');
     """
     await engine.execute(query)

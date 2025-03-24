@@ -1,6 +1,6 @@
 # sync/migrations/20241221082754_create_table_ref_role_menus.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 table = "ref_role_menus"
 
