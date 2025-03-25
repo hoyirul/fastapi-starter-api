@@ -2,7 +2,7 @@
 
 ## Structure
 ```bash
-fastapi-starter-api/
+accounting-backend/
 ├── docs/
 │   ├── convention-id.md
 │   ├── convention-en.md
@@ -30,19 +30,16 @@ fastapi-starter-api/
 │   ├── config/
 │   │   ├── __init__.py
 │   │   ├── config.py
-│   ├── databases/
+│   ├── database/
 │   │   ├── __init__.py
 │   │   ├── db.py
 │   │   ├── redis.py
-│   ├── utils/
+│   ├── tools/
 │   │   ├── __init__.py
 │   │   ├── response.py
 │   │   ├── dependency.py
 │   │   ├── logger.py
 │   │   └── security.py
-│   ├── middlewares/
-│   │   ├── __init__.py
-│   │   ├── middleware.py
 │   ├── main.py
 │   ├── routers.py
 │   └── startup.py
@@ -66,30 +63,6 @@ fastapi-starter-api/
 └── requirements.txt
 ```
 
-## Pre-Installation
-1. Install Python 3.10 or higher
-    ```bash
-    > sudo apt-get update
-    > sudo apt-get install python3.10
-    ```
-2. Install Pip
-    ```bash
-    > sudo apt-get install python3-pip
-    ```
-3. Install Virtual Environment
-    ```bash
-    > pip install virtualenv
-    ```
-4. Install PostgreSQL
-    ```bash
-    > sudo apt-get install postgresql
-    ```
-5. Install Redis
-    ```bash
-    > sudo apt-get install redis-server
-    ```
-
-
 ## Installation
 1. Clone the Project
     ```bash 
@@ -97,7 +70,7 @@ fastapi-starter-api/
     ```
 2. Setup Environment
     ```bash 
-    > cd fastapi-starter-api
+    > cd accounting-be
     > python -m venv venv
     > source venv/bin/activate # Linux/MacOS
     > venv\Scripts\Activate # Windows OS
@@ -193,4 +166,4 @@ fastapi-starter-api/
 [MIT](https://choosealicense.com/licenses/mit/) License
 
 ## Author
-[CV. Mochammad Hairullah - 2024](https://irasa.co.id)
+[CV. Ika Raya Sentausa - 2024](https://irasa.co.id)
