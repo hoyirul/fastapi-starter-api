@@ -1,6 +1,6 @@
 # app.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 import uvicorn
 from src.main import app
