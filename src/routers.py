@@ -1,6 +1,6 @@
 # src/routers.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from fastapi import APIRouter
 from src.modules.authentications.auth.routers import router as auth_router
@@ -13,7 +13,7 @@ from src.modules.authentications.menus.routers import router as menu_router
 from src.modules.logs.actions.routers import router as action_router
 from src.modules.logs.audit_logs.routers import router as audit_log_router
 
-# MASTER
+# MASTER ACCOUNTS
 from src.modules.masters.account_types.routers import router as account_type_router
 
 routers = APIRouter()  # Test Commit
