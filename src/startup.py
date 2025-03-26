@@ -1,6 +1,6 @@
 # src/startup.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 import logging
 from src.databases import db  # Ensure db contains engine and session configurations
