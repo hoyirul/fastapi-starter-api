@@ -1,6 +1,6 @@
 # src/main.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 import os
 from fastapi import FastAPI, HTTPException
@@ -49,7 +49,7 @@ async def root(request: Request):
         "redoc": f"/redoc",
         "convention_id": "/docs/convention-id.md",
         "convention_en": "/docs/convention-en.md",
-        "by": "Mochammad Hairullah",
+        "by": "Ika Raya Sentausa",
     }
     return templates.TemplateResponse("index.html", {"request": request, "data": data})
 
