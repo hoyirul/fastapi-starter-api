@@ -1,6 +1,6 @@
 # src/databases/redis.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 import redis
 from src.configs import Config
