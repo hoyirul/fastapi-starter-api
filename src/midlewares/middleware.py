@@ -1,6 +1,6 @@
 # src/middlewares/middleware.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from fastapi import FastAPI, status
 from fastapi.requests import Request
@@ -11,7 +11,6 @@ from fastapi.responses import JSONResponse
 import time
 from src.utils.dependency import AccessTokenBearer
 from fastapi.exceptions import HTTPException
-import socket
 
 logger = Logging(level="DEBUG")
 """
@@ -80,10 +79,7 @@ class Middleware:
                 authorize = await AccessTokenBearer()(request)
                 if authorize:
                     request.state.authorize = authorize
-                    hostname = socket.gethostname()
-                    request.state.authorize["ip_address"] = socket.gethostbyname(
-                        hostname
-                    )
+                    request.state.authorize["ip_address"] = request.client.host
 
                 response = await call_next(request)
                 return response
