@@ -1,6 +1,6 @@
 # src/utils/parsers.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from datetime import datetime
 

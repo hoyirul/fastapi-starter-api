@@ -1,6 +1,6 @@
 # src/utils/logging.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 import sys
 from loguru import logger  # Use the global loguru logger
@@ -82,12 +82,12 @@ class ActivityLog(Logging):
         Log an activity performed by a user.
         """
         log = dict(
-            user_id=int(request.state.authorize["user"]["id"]),
+            user_id=int(body["user_id"]) if "user_id" in body else int(request.state.authorize["user"]["id"]),
             action_id=int(body["action_id"]),
             record_id=str(body["record_id"]),
-            ip_address=request.state.authorize["ip_address"],
+            ip_address=body["ip_address"] if "ip_address" in body else request.state.authorize["ip_address"],
             model_name=str(body["model_name"]),
-            notes=f"User {request.state.authorize['user']['email']} has performed an action",
+            notes=body["notes"] if "notes" in body else f"User {request.state.authorize['user']['email']} has performed an action",
         )
 
         # First, check if there's already a log for this action_id and record_id
@@ -107,6 +107,7 @@ class ActivityLog(Logging):
         )
         audit_log = await session.execute(q)
         existing_log = audit_log.scalars().first()
+        self.log("debug", f"Existing log: {existing_log}")
 
         if existing_log:
             # If the log exists, update it

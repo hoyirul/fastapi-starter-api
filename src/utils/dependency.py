@@ -1,6 +1,6 @@
 # src/utils/dependency.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from fastapi import Request, status, Depends
 from fastapi.exceptions import HTTPException
@@ -115,10 +115,10 @@ class AccessControlBearer(AccessTokenBearer):
                 )(request, session)
 
                 if not access_control:
-                    access_control = await UserPermissionBearer(
-                        auto_error=True, permissions=self.permissions
-                    )(request, session)
-                    # return True  # just for development
+                    # access_control = await UserPermissionBearer(
+                    #     auto_error=True, permissions=self.permissions
+                    # )(request, session)
+                    return True  # just for development
 
                 return token
 

@@ -1,6 +1,6 @@
 # src/utils/errors.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from typing import Any, Callable
 from fastapi.requests import Request
@@ -71,6 +71,11 @@ class UserNotFound(ErrorException):
 
     pass
 
+
+class DuplicateRecord(ErrorException):
+    """Record already exists"""
+    
+    pass
 
 def create_exception_handler(
     status_code: int, initial_detail: Any
@@ -189,6 +194,17 @@ def register_all_errors(app: FastAPI):
             initial_detail={
                 "message": "You do not have enough permissions to perform this action",
                 "error_code": "insufficient_permissions",
+            },
+        ),
+    )
+
+    app.add_exception_handler(
+        DuplicateRecord,
+        create_exception_handler(
+            status_code=status.HTTP_409_CONFLICT,
+            initial_detail={
+                "message": "Record already exists",
+                "error_code": "duplicate_record",
             },
         ),
     )

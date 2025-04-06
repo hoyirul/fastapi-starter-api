@@ -1,6 +1,6 @@
 # src/utils/security.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 """
 This module contains security-related functions such as password hashing, password verification, token generation, and token verification.
