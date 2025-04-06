@@ -1,6 +1,6 @@
 # src/modules/authentications/menus/routers.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from fastapi import APIRouter, status, Depends, Request, Query
 from fastapi.exceptions import HTTPException
@@ -10,7 +10,8 @@ from .schemas import (
     MenuResponseSchema,
     GiveMenuToRoleSchema,
     GiveMenuToUserSchema,
-    SelectMenuSchema
+    SelectMenuSchema,
+    MenuHierarchySchema
 )
 from .models import Menu
 from .services import MenuService
@@ -154,3 +155,23 @@ async def patch(
     _: bool = Depends(AccessControlBearer(permissions=["manage:menus", "restore:menus"])),
 ):
     return await service.restore(id, request, session)
+
+@router.get(
+    "/hierarchy/show",
+    response_model=List[MenuHierarchySchema],
+    status_code=status.HTTP_200_OK,
+)
+async def get_menu_hierarchy(
+    request: Request,
+    session: AsyncSession = Depends(session),
+    _: bool = Depends(
+        AccessControlBearer(permissions=["manage:menus", "hierarchy:menus"])
+    ),
+):
+    try:
+        # Get the hierarchical menu data
+        hierarchy_data = await service.hierarchy(request, session)
+        return hierarchy_data
+    except Exception as e:
+        # Handle errors and return a HTTP 500 response
+        raise HTTPException(status_code=500, detail=str(e))

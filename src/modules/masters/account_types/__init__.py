@@ -1,6 +1,6 @@
 # src/modules/masters/account_types/__init__.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from . import models
 from . import routers

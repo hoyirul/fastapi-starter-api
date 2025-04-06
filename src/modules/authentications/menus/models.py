@@ -1,13 +1,14 @@
 # src/modules/authentications/menus/models.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from sqlmodel import SQLModel, Field, Column, Relationship
 import sqlalchemy.dialects.postgresql as pg
 from datetime import datetime
 import sqlalchemy as sa
 from typing import List, Optional
-
+from sqlmodel import select
+from sqlalchemy.ext.asyncio.session import AsyncSession
 
 class Menu(SQLModel, table=True):
     __tablename__ = "mst_menus"
@@ -34,6 +35,16 @@ class Menu(SQLModel, table=True):
     def __repr__(self):
         # you have to change this to your model fields to be displayed for example self.id
         return f"<Menu {self.id}>"
+    
+    async def is_used(self, id: int, session: AsyncSession) -> bool:
+        query = select(RoleMenu).filter(RoleMenu.menu_id == id)
+        result = await session.execute(query)
+        role_menus = result.scalars().all()
+
+        query = select(UserMenu).filter(UserMenu.menu_id == id)
+        result = await session.execute(query)
+        user_menus = result.scalars().all()
+        return len(role_menus) > 0 or len(user_menus) > 0
 
 class RoleMenu(SQLModel, table=True):
     __tablename__ = "ref_role_menus"

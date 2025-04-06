@@ -1,6 +1,6 @@
 # src/modules/logs/actions/services.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi.exceptions import HTTPException
@@ -14,7 +14,7 @@ from sqlalchemy.orm import joinedload
 from src.utils.logging import Logging, ActivityLog
 from src.utils.actions import ActionType
 from sqlalchemy import func
-
+from src.utils.helper import DuplicateChecker
 
 class ActionService:
     # you can delete the function below if you don't need it
@@ -38,7 +38,7 @@ class ActionService:
         q = (
             select(Action)
             .select_from(Action)
-            .outerjoin(AuditLog, AuditLog.record_id == cast(Action.id, String))
+            # .outerjoin(AuditLog, AuditLog.record_id == cast(Action.id, String))
         )
 
         # Apply search keyword filter
@@ -116,21 +116,30 @@ class ActionService:
     async def create(
         self, request: Request, body: ActionRequestSchema, session: AsyncSession
     ) -> dict:
-        body = Action(**body.dict())
-        body.name = body.name.upper()
-        session.add(body)
-        await session.commit()
+        # Check if the record already exists
+        checker = DuplicateChecker(Action, session)
+        await checker.check({"name": body.name}) # Change the field name if necessary
+        try:
+            body = Action(**body.dict())
+            body.name = body.name.upper()
+            session.add(body)
+            await session.commit()
 
-        await self.activity_log(
-            request=request,
-            body={
-                "action_id": await self.action_type("CREATE", session),
-                "record_id": body.id,
-                "model_name": Action.__tablename__,
-            },
-            session=session,
-        )
-        return body
+            await self.activity_log(
+                request=request,
+                body={
+                    "action_id": await self.action_type("CREATE", session),
+                    "record_id": body.id,
+                    "model_name": Action.__tablename__,
+                },
+                session=session,
+            )
+            return body
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
 
     async def update(
         self,
@@ -138,31 +147,45 @@ class ActionService:
         request: Request,
         body: ActionRequestSchema,
         session: AsyncSession,
-    ) -> dict:
+    ) -> dict:# Check if the record already exists
+        checker = DuplicateChecker(Action, session)
+        await checker.check({"name": body.name}) # Change the field name if necessary
         response = await self.find(id, request, session)
-        if response:
-            for key, value in body.dict().items():
-                # value name should be uppercase
-                if key == "name":
-                    value = value.upper()
-                    
-                setattr(response, key, value)
-            await session.commit()
+        try:
+            if response:
+                for key, value in body.dict().items():
+                    # value name should be uppercase
+                    if key == "name":
+                        value = value.upper()
+                        
+                    setattr(response, key, value)
+                await session.commit()
 
-        await self.activity_log(
-            request=request,
-            body={
-                "action_id": await self.action_type("UPDATE", session),
-                "record_id": id,
-                "model_name": Action.__tablename__,
-            },
-            session=session,
-        )
+            await self.activity_log(
+                request=request,
+                body={
+                    "action_id": await self.action_type("UPDATE", session),
+                    "record_id": id,
+                    "model_name": Action.__tablename__,
+                },
+                session=session,
+            )
 
-        return response
+            return response
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
 
     async def destroy(self, id: int, request: Request, session: AsyncSession) -> dict:
         response = await self.find(id, request, session)
+
+        if await Action().is_used(id, session):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Cannot delete this data because it is used in other transactions"
+            )
 
         await self.activity_log(
             request=request,

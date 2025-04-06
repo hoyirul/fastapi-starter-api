@@ -1,6 +1,6 @@
 # src/modules/logs/audit_logs/routers.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from fastapi import APIRouter, status, Depends, Request, Query
 from fastapi.exceptions import HTTPException
@@ -37,6 +37,26 @@ async def index(
     ),
 ):
     return await service.all(request, session, keywords, skip, limit)
+
+@router.get(
+    "/own/activities", response_model=AuditLogResponseSchema, status_code=status.HTTP_200_OK
+)
+async def index(
+    request: Request,
+    session: AsyncSession = Depends(session),
+    keywords: str = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, le=100),
+):
+    return await service.own_activities(request, session, keywords, skip, limit)
+
+@router.get("/own/{id}/activities", response_model=AuditLogSchema, status_code=status.HTTP_200_OK)
+async def show(
+    id: int,
+    request: Request,
+    session: AsyncSession = Depends(session),
+):
+    return await service.find_own_log(id, request, session)
 
 @router.get("/{id}", response_model=AuditLogSchema, status_code=status.HTTP_200_OK)
 async def show(

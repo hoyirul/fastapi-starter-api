@@ -1,6 +1,6 @@
 # src/modules/logs/actions/routers.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from fastapi import APIRouter, status, Depends, Request, Query
 from fastapi.exceptions import HTTPException

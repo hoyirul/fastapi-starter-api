@@ -1,6 +1,6 @@
 # src/modules/authentications/users/services.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi.exceptions import HTTPException
@@ -306,6 +306,7 @@ class UserService:
     async def active(self, id: int, request: Request, session: AsyncSession) -> dict:
         response = await self.find(id, request, session)
         response.active = True
+        response.failed_login_attempts = 0
         await session.commit()
 
         await self.activity_log(

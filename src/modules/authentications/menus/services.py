@@ -1,6 +1,6 @@
 # src/modules/authentications/menus/services.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi.exceptions import HTTPException
@@ -8,17 +8,19 @@ from .schemas import (
     MenuRequestSchema,
     GiveMenuToRoleSchema,
     GiveMenuToUserSchema,
-    SelectMenuSchema
+    SelectMenuSchema,
+    MenuHierarchySchema
 )
 from .models import Menu, RoleMenu, UserMenu
 from src.modules.logs.audit_logs.models import AuditLog
 from sqlmodel import select, desc, cast, String
 from fastapi import status, Request
-from typing import Optional
-from sqlalchemy.orm import joinedload
+from typing import Optional, List
+from sqlalchemy.orm import joinedload, selectinload
 from src.utils.logging import Logging, ActivityLog
 from src.utils.actions import ActionType
 from sqlalchemy import func
+from src.utils.helper import DuplicateChecker
 
 class MenuService:
     # you can delete the function below if you don't need it
@@ -105,28 +107,56 @@ class MenuService:
         return response
 
     async def create(self, request: Request, body: MenuRequestSchema, session: AsyncSession) -> dict:
-        body = Menu(**body.dict())
-        body.parent_id = None if body.parent_id == 0 else body.parent
-        session.add(body)
-        await session.commit()
+        # Check if the record already exists
+        checker = DuplicateChecker(Menu, session)
+        await checker.check({
+                "name": body.name,
+                "alias": body.alias,
+                "link": body.link,
+            }) # Change the field name if necessary
+        try:
+            body = Menu(**body.dict())
+            body.name = body.name.title()
+            body.parent_id = None if body.parent_id == 0 else body.parent
+            session.add(body)
+            await session.commit()
 
-        await self.activity_log(request=request,body={"action_id":await self.action_type("CREATE", session),"record_id":body.id,"model_name":Menu.__tablename__},session=session)
-        
-        return body
+            await self.activity_log(request=request,body={"action_id":await self.action_type("CREATE", session),"record_id":body.id,"model_name":Menu.__tablename__},session=session)
+            
+            return body
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
 
     async def update(
         self, id: int, request: Request, body: MenuRequestSchema, session: AsyncSession
     ) -> dict:    
+        # Check if the record already exists
+        checker = DuplicateChecker(Menu, session)
+        await checker.check({
+                "name": body.name,
+                "alias": body.alias,
+                "link": body.link,
+            }) # Change the field name if necessary
         response = await self.find(id, request, session)
-        for key, value in body.dict().items():
-            if key == "parent_id":
-                value = None if value == 0 else value
-            setattr(response, key, value)
-        await session.commit()
-                
-        await self.activity_log(request=request,body={"action_id":await self.action_type("UPDATE", session),"record_id":id,"model_name":Menu.__tablename__},session=session)
+        try:
+            body.name = body.name.title()
+            for key, value in body.dict().items():
+                if key == "parent_id":
+                    value = None if value == 0 else value
+                setattr(response, key, value)
+            await session.commit()
+                    
+            await self.activity_log(request=request,body={"action_id":await self.action_type("UPDATE", session),"record_id":id,"model_name":Menu.__tablename__},session=session)
 
-        return response
+            return response
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
     
     async def give_menu_to_role(self, request: Request, body: GiveMenuToRoleSchema, session: AsyncSession) -> dict:
         given_menus = []
@@ -215,8 +245,99 @@ class MenuService:
             await session.rollback() 
             return {"status": "error", "message": str(e)}
 
+    async def hierarchy(
+        self,
+        request: Request,
+        session: AsyncSession,
+    ) -> List[MenuHierarchySchema]:
+        """
+        Retrieves menus in a hierarchical structure (parent-child) for a specific user
+        based on their role and user-specific access.
+        """
+        # Get user information from the request state
+        user_info = request.state.authorize
+        user_id = user_info['user']['id']  # get user_id from request
+        role_id = user_info['user']['role_id']  # get role_id from request
+        
+        print(f"User ID: {user_id}, Role ID: {role_id}")
+        
+        trashed = await AuditLog().is_trashed(Menu)
+
+        # Query for fetching menus based on user and role
+        q = (
+            select(Menu)
+            .join(RoleMenu, isouter=True)  # Outer join with RoleMenu to get all menus accessible by the role
+            .join(UserMenu, isouter=True)  # Outer join with UserMenu to get all menus accessible by the user
+            .options(joinedload(Menu.parent))  # Load parent relationship
+            .filter(
+                (UserMenu.user_id == user_id) |  # Check menu associated with user_id
+                (RoleMenu.role_id == role_id)   # Check menu associated with role_id
+            )
+            .filter(~trashed)  # Exclude trashed data
+            .order_by(Menu.id)
+        )
+
+        result = await session.execute(q)
+        menus = result.scalars().all()
+
+        # Function to convert Menu object to dictionary
+        def menu_to_dict(menu: Menu) -> MenuHierarchySchema:
+            return MenuHierarchySchema(
+                id=menu.id,
+                parent_id=menu.parent_id,
+                name=menu.name,
+                alias=menu.alias,
+                link=menu.link,
+                icon=menu.icon,
+                ordering=menu.ordering,
+                children=[]
+            )
+
+        # Function to build the hierarchy structure
+        def build_hierarchy(
+            menus: List[Menu],
+            parent_id: int = None,
+            processed_codes: set = None,
+        ) -> List[dict]:
+            """
+            Build the hierarchy structure, ensuring that each root has its correct children.
+            """
+            if processed_codes is None:
+                processed_codes = set()
+
+            root_menus = []
+
+            # Iterate through all menus and organize them into parent-child structure
+            for menu in menus:
+                if menu.id in processed_codes:
+                    continue  # Skip menus that have already been processed
+
+                if menu.parent_id == parent_id or parent_id is None:
+                    # Create a dictionary for the current menu
+                    menu_dict = menu_to_dict(menu)
+
+                    # Add to the processed set to avoid duplicates
+                    processed_codes.add(menu.id)
+
+                    # Recursively find children and add them to the current menu
+                    children = build_hierarchy(menus, menu.id, processed_codes)
+                    menu_dict.children.extend(children)
+
+                    root_menus.append(menu_dict)
+
+            return root_menus
+
+        # Build the hierarchy structure for the user
+        hierarchy = build_hierarchy(menus)
+        return hierarchy
+
     async def destroy(self, id: int, request: Request, session: AsyncSession) -> dict:
         response = await self.find(id, request, session)
+
+        if await Menu().is_used(id, session):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete this data because it is used in other transactions"
+            )
         # await session.delete(response) # This hard delete the record, you can change it to soft delete with:
         # await session.commit()
                 

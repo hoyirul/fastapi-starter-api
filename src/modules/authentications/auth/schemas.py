@@ -1,6 +1,6 @@
 # src/modules/authentications/auth/schemas.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -16,6 +16,7 @@ class AuthSchema(BaseModel):
     role: str
     active: bool = True
     last_logged_in: Optional[datetime] = None
+    failed_login_attempts: int = 0
 
     class Config:
         orm_mode = True

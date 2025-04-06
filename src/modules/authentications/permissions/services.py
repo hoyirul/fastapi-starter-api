@@ -1,10 +1,10 @@
 # src/modules/authentications/permissions/services.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi.exceptions import HTTPException
-from .schemas import PermissionRequestSchema, SelectPermissionSchema
+from .schemas import PermissionRequestSchema, HasPermissionRequestSchema
 from .models import Permission
 from src.modules.logs.audit_logs.models import AuditLog
 from sqlmodel import select, desc, cast, String
@@ -15,7 +15,7 @@ from src.modules.authentications.users.models import User
 from src.utils.logging import Logging, ActivityLog
 from src.utils.actions import ActionType
 from sqlalchemy import func
-
+from src.utils.helper import DuplicateChecker
 
 class PermissionService:
     def __init__(self):
@@ -112,6 +112,49 @@ class PermissionService:
             )
         return response
 
+    async def authorize(
+        self, body: HasPermissionRequestSchema, request: Request, session: AsyncSession
+    ) -> dict:
+        from src.modules.authentications.roles.models import RolePermission
+        from src.modules.authentications.users.models import UserPermission
+
+        if request.state.authorize["user"]["role_id"] == 1:
+            return {
+                "authorized": True,
+                "permission": "Super Admin has all permissions",
+            }
+
+        q = (
+            select(RolePermission)
+            .join(Permission)
+            .where(Permission.name == body.name)
+            .where(RolePermission.role_id == request.state.authorize["user"]["role_id"])
+        )
+
+        result = await session.execute(q)
+        response = result.scalars().first()
+
+        if response is None:
+            q = (
+                select(UserPermission)
+                .join(Permission)
+                .where(Permission.name == body.name)
+                .where(UserPermission.user_id == request.state.authorize["user"]["id"])
+            )
+            result = await session.execute(q)
+            response = result.scalars().first()
+
+            if response is None:
+                return {
+                    "authorized": False,
+                    "permission": None,
+                }
+        
+        return {
+            "authorized": True,
+            "permission": response,
+        }
+
     async def select(self, request: Request, session: AsyncSession) -> list:
         trashed = await AuditLog().is_trashed(Permission)
         q = select(Permission).filter(~trashed).order_by(Permission.id)
@@ -126,21 +169,33 @@ class PermissionService:
         body: PermissionRequestSchema,
         session: AsyncSession,
     ) -> dict:
-        body = Permission(**body.dict())
-        session.add(body)
-        await session.commit()
+        # Check if the record already exists
+        checker = DuplicateChecker(Permission, session)
+        await checker.check({
+                "name": body.name
+            }) # Change the field name if necessary
+        try:
+            body = Permission(**body.dict())
+            body.name = body.name.title()
+            session.add(body)
+            await session.commit()
 
-        await self.activity_log(
-            request=request,
-            body={
-                "action_id": await self.action_type("CREATE", session),
-                "record_id": body.id,
-                "model_name": Permission.__tablename__,
-            },
-            session=session,
-        )
+            await self.activity_log(
+                request=request,
+                body={
+                    "action_id": await self.action_type("CREATE", session),
+                    "record_id": body.id,
+                    "model_name": Permission.__tablename__,
+                },
+                session=session,
+            )
 
-        return body
+            return body
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
 
     async def update(
         self,
@@ -149,26 +204,43 @@ class PermissionService:
         body: PermissionRequestSchema,
         session: AsyncSession,
     ) -> dict:
+        # Check if the record already exists
+        checker = DuplicateChecker(Permission, session)
+        await checker.check({
+                "name": body.name
+            }) # Change the field name if necessary
         response = await self.find(id, request, session)
-        for key, value in body.dict().items():
-            setattr(response, key, value)
-        await session.commit()
+        try:
+            body.name = body.name.title()
+            for key, value in body.dict().items():
+                setattr(response, key, value)
+            await session.commit()
 
-        await self.activity_log(
-            request=request,
-            body={
-                "action_id": await self.action_type("UPDATE", session),
-                "record_id": id,
-                "model_name": Permission.__tablename__,
-            },
-            session=session,
-        )
+            await self.activity_log(
+                request=request,
+                body={
+                    "action_id": await self.action_type("UPDATE", session),
+                    "record_id": id,
+                    "model_name": Permission.__tablename__,
+                },
+                session=session,
+            )
 
-        return response
+            return response
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
 
     async def destroy(self, id: int, request: Request, session: AsyncSession) -> dict:
         response = await self.find(id, request, session)
 
+        if await Permission().is_used(id, session):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete this data because it is used in other transactions"
+            )
+        
         await self.activity_log(
             request=request,
             body={

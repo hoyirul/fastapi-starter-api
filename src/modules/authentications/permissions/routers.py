@@ -1,6 +1,6 @@
 # src/modules/authentications/permissions/routers.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from fastapi import APIRouter, status, Depends, Request, Query
 from fastapi.exceptions import HTTPException
@@ -8,7 +8,8 @@ from .schemas import (
     PermissionRequestSchema, 
     PermissionSchema, 
     PermissionResponseSchema,
-    SelectPermissionSchema
+    SelectPermissionSchema,
+    HasPermissionRequestSchema,
 )
 from src.modules.authentications.permissions.models import Permission
 from .services import PermissionService
@@ -56,6 +57,14 @@ async def show(
     ),
 ):
     return await service.find(id, request, session)
+
+@router.post("/authorize", status_code=status.HTTP_200_OK)
+async def authorize(
+    body: HasPermissionRequestSchema,
+    request: Request,
+    session: AsyncSession = Depends(session),
+):
+    return await service.authorize(body, request, session)
 
 @router.get("/select/all", response_model=List[SelectPermissionSchema], status_code=status.HTTP_200_OK)
 async def select_all(

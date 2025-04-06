@@ -1,6 +1,6 @@
 # src/modules/authentications/permissions/schemas.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -35,3 +35,9 @@ class SelectPermissionSchema(BaseModel):
 class PermissionRequestSchema(BaseModel):
     name: str
     description: Optional[str]
+
+class HasPermissionRequestSchema(BaseModel):
+    name: str
+
+    class Config:
+        orm_mode = True 

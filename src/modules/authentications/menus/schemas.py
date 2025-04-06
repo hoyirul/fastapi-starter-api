@@ -1,6 +1,6 @@
 # src/modules/authentications/menus/schemas.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from pydantic import BaseModel
 from datetime import datetime
@@ -17,7 +17,7 @@ class MenuHierarchySchema(BaseModel):
     link: Optional[str]
     icon: Optional[str]
     ordering: int
-    children: Optional[List["MenuHierarchySchema"]] = []
+    children: Optional[List["MenuHierarchySchema"]] = ([])  # Optional list of children (recursive)
 
     class Config:
         orm_mode = True
@@ -46,6 +46,7 @@ class SelectMenuSchema(BaseModel):
     id: int
     parent_id: Optional[int]
     name: str
+    ordering: int
 
     class Config:
         orm_mode = True

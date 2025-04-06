@@ -1,6 +1,6 @@
 # src/modules/masters/account_types/services.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi.exceptions import HTTPException
@@ -14,7 +14,7 @@ from sqlalchemy.orm import joinedload
 from src.utils.logging import Logging, ActivityLog
 from src.utils.actions import ActionType
 from sqlalchemy import func
-
+from src.utils.helper import DuplicateChecker
 
 class AccountTypeService:
     # you can delete the function below if you don't need it
@@ -31,66 +31,61 @@ class AccountTypeService:
         skip: int = 0,
         limit: int = 10,
     ) -> dict:
-        try:
-            # Checking if the record is trashed (deleted)
-            trashed = await AuditLog().is_trashed(AccountType)
+        # Checking if the record is trashed (deleted)
+        trashed = await AuditLog().is_trashed(AccountType)
 
-            # Build the query for fetching data
-            q = (
-                select(AccountType)
-                .select_from(AccountType)
-                .outerjoin(AuditLog, AuditLog.record_id == cast(AccountType.id, String))
+        # Build the query for fetching data
+        q = (
+            select(AccountType)
+            .select_from(AccountType)
+            # .outerjoin(AuditLog, AuditLog.record_id == cast(AccountType.id, String))
+        )
+
+        # Apply search keyword filter
+        if keywords:
+            q = q.filter(AccountType.name.ilike(f"%{keywords}%"))
+
+        q = (
+            q.options(
+                joinedload(AccountType.audit_logs),
+                joinedload(AccountType.audit_logs).joinedload(AuditLog.user),
+                joinedload(AccountType.audit_logs).joinedload(AuditLog.action),
             )
+            .filter(~trashed)  # Exclude trashed data
+            .order_by(desc(AccountType.id))  # Order by AccountType.id descending
+            .offset(skip)  # Pagination offset (skip)
+            .limit(limit)  # Pagination limit (number of records per page)
+        )
 
-            # Apply search keyword filter
-            if keywords:
-                q = q.filter(AccountType.name.ilike(f"%{keywords}%"))
+        # Execute the query for data data with pagination
+        result = await session.execute(q)
+        response = result.unique().scalars().all()
 
-            q = (
-                q.options(
-                    joinedload(AccountType.audit_logs),
-                    joinedload(AccountType.audit_logs).joinedload(AuditLog.user),
-                    joinedload(AccountType.audit_logs).joinedload(AuditLog.action),
-                )
-                .filter(~trashed)  # Exclude trashed data
-                .order_by(desc(AccountType.id))  # Order by AccountType.id descending
-                .offset(skip)  # Pagination offset (skip)
-                .limit(limit)  # Pagination limit (number of records per page)
-            )
+        # Count the total number of records without pagination
+        count_query = (
+            select(func.count(AccountType.id)).select_from(AccountType).filter(~trashed)
+        )
+        if keywords:
+            count_query = count_query.filter(AccountType.name.ilike(f"{keywords}"))
+        count_response = await session.execute(count_query)
+        total_count = count_response.scalar()
 
-            # Execute the query for data data with pagination
-            result = await session.execute(q)
-            response = result.unique().scalars().all()
+        # Calculate the total number of pages
+        total_pages = (
+            total_count + limit - 1
+        ) // limit  # This is the ceiling of total_count / limit
 
-            # Count the total number of records without pagination
-            count_query = (
-                select(func.count(AccountType.id)).select_from(AccountType).filter(~trashed)
-            )
-            if keywords:
-                count_query = count_query.filter(AccountType.name.ilike(f"{keywords}"))
-            count_response = await session.execute(count_query)
-            total_count = count_response.scalar()
+        # Calculate the current page based on skip and limit
+        current_page = skip // limit + 1 if total_count > 0 else 0
 
-            # Calculate the total number of pages
-            total_pages = (
-                total_count + limit - 1
-            ) // limit  # This is the ceiling of total_count / limit
-
-            # Calculate the current page based on skip and limit
-            current_page = skip // limit + 1 if total_count > 0 else 0
-
-            # Return the data along with pagination information
-            return {
-                "current_page": current_page,
-                "total_count": total_count,
-                "per_page": limit,
-                "total_pages": total_pages,
-                "data": response,
-            }
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
-            )
+        # Return the data along with pagination information
+        return {
+            "current_page": current_page,
+            "total_count": total_count,
+            "per_page": limit,
+            "total_pages": total_pages,
+            "data": response,
+        }
 
     async def find(
         self, id: int, request: Request, session: AsyncSession
@@ -127,21 +122,31 @@ class AccountTypeService:
     async def create(
         self, request: Request, body: AccountTypeRequestSchema, session: AsyncSession
     ) -> dict:
-        body = AccountType(**body.dict())
-        session.add(body)
-        await session.commit()
+        # Check if the record already exists
+        checker = DuplicateChecker(AccountType, session)
+        await checker.check({"name": body.name}) # Change the field name if necessary
+        try:
+            body = AccountType(**body.dict())
+            body.name = body.name.title()
+            session.add(body)
+            await session.commit()
 
-        await self.activity_log(
-            request=request,
-            body={
-                "action_id": await self.action_type("CREATE", session),
-                "record_id": body.id,
-                "model_name": AccountType.__tablename__,
-            },
-            session=session,
-        )
+            await self.activity_log(
+                request=request,
+                body={
+                    "action_id": await self.action_type("CREATE", session),
+                    "record_id": body.id,
+                    "model_name": AccountType.__tablename__,
+                },
+                session=session,
+            )
 
-        return body
+            return body
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
 
     async def update(
         self,
@@ -150,25 +155,42 @@ class AccountTypeService:
         body: AccountTypeRequestSchema,
         session: AsyncSession,
     ) -> dict:
+        # Check if the record already exists
+        checker = DuplicateChecker(AccountType, session)
+        await checker.check({"name": body.name}) # Change the field name if necessary
+
         response = await self.find(id, request, session)
-        for key, value in body.dict().items():
-            setattr(response, key, value)
-        await session.commit()
+        try: 
+            body.name = body.name.title()
+            for key, value in body.dict().items():
+                setattr(response, key, value)
+            await session.commit()
 
-        await self.activity_log(
-            request=request,
-            body={
-                "action_id": await self.action_type("UPDATE", session),
-                "record_id": id,
-                "model_name": AccountType.__tablename__,
-            },
-            session=session,
-        )
+            await self.activity_log(
+                request=request,
+                body={
+                    "action_id": await self.action_type("UPDATE", session),
+                    "record_id": id,
+                    "model_name": AccountType.__tablename__,
+                },
+                session=session,
+            )
 
-        return response
+            return response
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
 
     async def destroy(self, id: int, request: Request, session: AsyncSession) -> dict:
         response = await self.find(id, request, session)
+
+        if await AccountType().is_used(id, session):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete this data because it is used in other transactions"
+            )
+
         # await session.delete(response) # This hard delete the record, you can change it to soft delete with:
         # await session.commit()
 

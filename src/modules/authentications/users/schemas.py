@@ -1,6 +1,6 @@
 # src/modules/authentications/users/schemas.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -25,13 +25,14 @@ class PermissionSchema(BaseModel):
     class Config:
         orm_mode = True
 
-
 class UserSchema(BaseModel):
     id: int
     name: str
     email: str
     password: str
     active: bool
+    last_logged_in: Optional[datetime]
+    failed_login_attempts: int = 0
     role: Optional[RoleSchema]
     permissions: Optional[List[PermissionSchema]]
     audit_logs: Optional[List[AuditLogSchema]]

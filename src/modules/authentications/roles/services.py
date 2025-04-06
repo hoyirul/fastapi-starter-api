@@ -1,6 +1,6 @@
 # src/modules/authentications/roles/services.py
 # -*- coding: utf-8 -*-
-# Copyright 2024 - Mochammad Hairullah
+# Copyright 2024 - Ika Raya Sentausa
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi.exceptions import HTTPException
@@ -19,6 +19,7 @@ from sqlalchemy.orm import joinedload
 from src.utils.logging import Logging, ActivityLog
 from src.utils.actions import ActionType
 from sqlalchemy import func
+from src.utils.helper import DuplicateChecker
 
 
 class RoleService:
@@ -125,40 +126,64 @@ class RoleService:
     async def create(
         self, request: Request, body: RoleRequestSchema, session: AsyncSession
     ) -> dict:
-        body = Role(**body.dict())
-        session.add(body)
-        await session.commit()
+        # Check if the record already exists
+        checker = DuplicateChecker(Role, session)
+        await checker.check({
+                "name": body.name
+            }) # Change the field name if necessary
+        try:
+            body = Role(**body.dict())
+            body.name = body.name.title()
+            session.add(body)
+            await session.commit()
 
-        await self.activity_log(
-            request=request,
-            body={
-                "action_id": await self.action_type("CREATE", session),
-                "record_id": body.id,
-                "model_name": Role.__tablename__,
-            },
-            session=session,
-        )
-        return body
+            await self.activity_log(
+                request=request,
+                body={
+                    "action_id": await self.action_type("CREATE", session),
+                    "record_id": body.id,
+                    "model_name": Role.__tablename__,
+                },
+                session=session,
+            )
+            return body
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
 
     async def update(
         self, id: int, request: Request, body: RoleRequestSchema, session: AsyncSession
     ) -> dict:
+        # Check if the record already exists
+        checker = DuplicateChecker(Role, session)
+        await checker.check({
+                "name": body.name
+            }) # Change the field name if necessary
         response = await self.find(id, request, session)
-        for key, value in body.dict().items():
-            setattr(response, key, value)
-        await session.commit()
+        try:
+            body.name = body.name.title()
+            for key, value in body.dict().items():
+                setattr(response, key, value)
+            await session.commit()
 
-        await self.activity_log(
-            request=request,
-            body={
-                "action_id": await self.action_type("UPDATE", session),
-                "record_id": id,
-                "model_name": Role.__tablename__,
-            },
-            session=session,
-        )
+            await self.activity_log(
+                request=request,
+                body={
+                    "action_id": await self.action_type("UPDATE", session),
+                    "record_id": id,
+                    "model_name": Role.__tablename__,
+                },
+                session=session,
+            )
 
-        return response
+            return response
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
 
     async def give_permission_to_role(
         self, request: Request, body: GivePermissionToRoleSchema, session: AsyncSession
@@ -207,6 +232,11 @@ class RoleService:
 
     async def destroy(self, id: int, request: Request, session: AsyncSession) -> dict:
         response = await self.find(id, request, session)
+
+        if await Role().is_used(id, session):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete this data because it is used in other transactions"
+            )
 
         await self.activity_log(
             request=request,
@@ -308,7 +338,9 @@ class RoleService:
         return response
 
     async def restore(self, id: int, request: Request, session: AsyncSession) -> dict:
-        response = await self.find(id, request, session)
+        q = select(Role).filter(Role.id == id)
+        role = await session.execute(q)
+        response = role.scalars().first()
 
         await self.activity_log(
             request=request,

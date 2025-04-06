@@ -17,6 +17,10 @@ class User(SQLModel, table=True):
     email: str = Field(sa_column=Column(pg.VARCHAR(255), unique=True))
     password: str = Field(sa_column=Column(pg.VARCHAR(255)))
     active: bool = Field(sa_column=Column(pg.BOOLEAN, default=True))
+    last_logged_in: Optional[datetime] = Field(
+        sa_column=Column(pg.TIMESTAMP, default=None)
+    )
+    failed_login_attempts: int = Field(sa_column=Column(pg.INTEGER, default=0))
     role: Optional["Role"] = Relationship(
         sa_relationship_kwargs={
             "secondary": "ref_user_roles",
