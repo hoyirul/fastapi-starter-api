@@ -17,9 +17,14 @@ async def seed(engine):
     (1, 'Permissions', 'group:users:permissions', '/users/permissions', 'UserCheckIcon', 3),
     (1, 'Access Menus', 'group:users:access-menus', '/users/access-menus', 'LockIcon', 4),
 
-    (NULL, 'Audit Logs', 'group:audit-logs', NULL, 'FileTextIcon', 5),
-    (6, 'Actions', 'group:audit-logs:actions', '/audit-logs/actions', 'NavigationIcon', 1),
-    (6, 'Logs', 'group:audit-logs:logs', '/audit-logs/logs', 'ListIcon', 2);
+    (NULL, 'Transactions', 'group:transactions', NULL, NULL, 3),
+    (6, 'Subscription Plans', 'group:transactions:subscription-plans', '/transactions/subscription-plans', 'CreditCardIcon', 1),
+    (6, 'Subscriptions', 'group:transactions:subscriptions', '/transactions/subscriptions', 'TrelloIcon', 2),
+    (6, 'Payments', 'group:transactions:payments', '/transactions/payments', 'CoffeeIcon', 3),
+
+    (NULL, 'Audit Logs', 'group:audit-logs', NULL, 'FileTextIcon', 2),
+    (10, 'Actions', 'group:audit-logs:actions', '/audit-logs/actions', 'NavigationIcon', 1),
+    (10, 'Logs', 'group:audit-logs:logs', '/audit-logs/logs', 'ListIcon', 2);
     """
     await engine.execute(query)
 
